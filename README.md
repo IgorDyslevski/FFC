@@ -9,7 +9,5 @@
 <h2>Пример работы</h2>
 <img src="Resources/photo1.png" alt="Resources/photo1.png">
 <img src="Resources/photo2.png" alt="Resources/photo2.png">
-<video src="Resources/video.mp4"></video>
-<video src="Resources/video2.mp4"></video>
 <h2>Как происходит выбор лица</h2>
 Как показано в предыдущем пункте, рядом с лицами появляются цифры, при нажатии которых на клавиатуре, лицо, цифру которого нажали будет становиться основным и за ним будет "следить" камера.
