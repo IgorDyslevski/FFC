@@ -35,6 +35,9 @@ class App(Ui_Form, QWidget):
         global mode, path_result_video
         mode = 1
         path_result_video = QtWidgets.QFileDialog.getSaveFileName(self, 'Выберите, куда сохранить файлы')[0]
+        self.camera = cv2.VideoCapture(0)
+        while True:
+            cv2.imshow('face', self.get_frame_video())
 
     def gettext(self, text):
         text, okPressed = QtWidgets.QInputDialog.getText(self, "Get text", text, QtWidgets.QLineEdit.Normal, "")
