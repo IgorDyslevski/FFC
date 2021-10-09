@@ -11,6 +11,8 @@ mode = None
 path_video = None
 # путь к последующему видео
 path_result_video = None
+
+
 class App(Ui_Form, QWidget):
     def __init__(self):
         super().__init__()
@@ -20,28 +22,55 @@ class App(Ui_Form, QWidget):
 
         self.camera = None
         self.mag = Magician('ApplicationResource/haarcascades/haarcascade_frontalface_default.xml')
+        self.recording = False
+        self.recorded = False
         self.big = True
+        self.videowritter = None
 
     def modeon0(self):
         global mode, path_video, path_result_video
         mode = 0
-        path_video = QtWidgets.QFileDialog.getOpenFileName(self, 'Выберите файл')[0]
-        path_result_video = QtWidgets.QFileDialog.getSaveFileName(self, 'Выберите, куда сохранить файлы')[0]
+        path_video = self.getFileFrom()
+        self.path_result_video = self.getFileTo()
+        self.resolution = self.getint('Exited resolution (square)')
         self.camera = cv2.VideoCapture(path_video)
+        self.videowritter = cv2.VideoWriter(self.path_result_video,
+                                            cv2.VideoWriter_fourcc(*'h264'), 60,
+                                            (self.resolution, self.resolution))
         while True:
-            cv2.imshow('face', self.get_frame_video())
+            face = self.get_frame_video()
+            try:
+                cv2.imshow('face', face)
+            except cv2.error:
+                print('Video ended')
+                exit(0)
 
     def modeon1(self):
         global mode, path_result_video
         mode = 1
-        path_result_video = QtWidgets.QFileDialog.getSaveFileName(self, 'Выберите, куда сохранить файлы')[0]
+        self.path_result_video = self.getFileTo()
+        self.resolution = self.getint('Exited resolution (square)')
         self.camera = cv2.VideoCapture(0)
+        self.videowritter = cv2.VideoWriter(self.path_result_video,
+                                            cv2.VideoWriter_fourcc(*'h264'), 60,
+                                            (self.resolution, self.resolution))
         while True:
-            cv2.imshow('face', self.get_frame_video())
+            face = self.get_frame_video()
+            cv2.imshow('face', face)
 
     def gettext(self, text):
         text, okPressed = QtWidgets.QInputDialog.getText(self, "Get text", text, QtWidgets.QLineEdit.Normal, "")
         return text
+
+    def getint(self, text):
+        text, okPressed = QtWidgets.QInputDialog.getInt(self, "Get integer", text)
+        return text
+
+    def getFileTo(self):
+        return QtWidgets.QFileDialog.getSaveFileName(self, 'Выберите, куда сохранить файлы')[0]
+
+    def getFileFrom(self):
+        return QtWidgets.QFileDialog.getOpenFileName(self, 'Выберите файл')[0]
 
     def get_frame_video(self):
         camera, big = self.camera, self.big
@@ -49,7 +78,14 @@ class App(Ui_Form, QWidget):
         # getting ret and frame from camera
         ret, frame = camera.read()
         # getting face coordinates from camera
-        faces_coords = mag.searhc_faces_from_raw_photo_yolo(frame)
+        try:
+            faces_coords = mag.searhc_faces_from_raw_photo_yolo(frame)
+        except AttributeError:
+            if self.recording:
+                self.videowritter.release()
+                print('saved')
+                exit(0)
+            return 'error'
         copy_frame = frame.copy()
         main_face = None
         # putting index and rectangle into frame
@@ -94,6 +130,15 @@ class App(Ui_Form, QWidget):
                     if key == ' ':
                         mag.unset_last_face()
                         big = True
+                    elif key == 's':
+                        print('Recording has started')
+                        self.recording = True
+                        self.recorded = True
+                    elif key == 'e' and self.recording:
+                        print('Recording has ended')
+                        self.recording = False
+                    elif key == 'q':
+                        exit(0)
             except ValueError:
                 print('Please, type a number')
         if main_face is None:
@@ -109,6 +154,13 @@ class App(Ui_Form, QWidget):
                 rframe = cv2.copyMakeBorder(rframe, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
                                             value=0)
         rframe = cv2.resize(rframe, (rframe.shape[0], rframe.shape[0]))
+        if self.recording:
+            self.videowritter.write(cv2.resize(rframe, (self.resolution, self.resolution)))
+            print('saving')
+        elif self.recorded and not self.recording:
+            self.videowritter.release()
+            print('saved')
+            exit(0)
         return rframe
 
 
