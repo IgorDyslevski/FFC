@@ -35,7 +35,7 @@ class App(Ui_Form, QWidget):
         self.resolution = self.getint('Exited resolution (square)')
         self.camera = cv2.VideoCapture(path_video)
         self.videowritter = cv2.VideoWriter(self.path_result_video,
-                                            cv2.VideoWriter_fourcc(*'h264'), 60,
+                                            cv2.VideoWriter_fourcc(*'h264'), self.camera.get(cv2.CAP_PROP_FPS),
                                             (self.resolution, self.resolution))
         while True:
             face = self.get_frame_video()
