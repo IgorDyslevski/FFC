@@ -109,6 +109,7 @@ class App(Ui_Form, QWidget):
                 else:
                     mag.unset_last_face()
             else:
+                mag.unset_last_face()
                 main_face = frame
         else:
             if big:
