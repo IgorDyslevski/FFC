@@ -91,33 +91,6 @@ class Magician:
             return -1
         return index_of_min_differnce
 
-    def search_face_like_last_face_8x8(self, faces_coords, photo):
-        results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
-        last_face = cv2.resize(
-            self.last_face_photo[last_face_y:last_face_y+last_face_h, last_face_x:last_face_x + last_face_w], (8, 8)
-        )
-        for x, y, w, h in faces_coords:
-            if x > -1 and y > -1:
-                face = cv2.resize(photo[y:y+h, x:x+w], (8, 8))
-            else:
-                if x < 0:
-                    x = 0
-                if y < 0:
-                    y = 0
-                face = cv2.resize(photo[y:y + h, x:x + w], (8, 8))
-
-            res = []
-            # print(type(last_face - face))
-            # print(last_face - face)
-            for i in (last_face - face).reshape(-1):
-                res += abs(i)
-            results_of_getting_distance.append(
-                sum(res)
-            )
-        index_of_min_differnce = results_of_getting_distance.index(min(results_of_getting_distance))
-        return index_of_min_differnce
-
     def search_faces_from_raw_photo_cv2(self, photo):
         gray_photo = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
         faces_coords = self.cascade.detectMultiScale(gray_photo, 1.2, 1)
