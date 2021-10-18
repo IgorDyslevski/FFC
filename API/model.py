@@ -94,7 +94,7 @@ class Magician:
     def search_faces_from_raw_photo_cv2(self, photo):
         gray_photo = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
         faces_coords = self.cascade.detectMultiScale(gray_photo, 1.2, 1)
-        faces_coords = list(sorted(faces_coords, key=lambda x: (x[0], x[1])))
+        faces_coords = list(sorted(faces_coords, key=lambda x: x[2], reverse=True))
         return faces_coords
 
     def searhc_faces_from_raw_photo_yolo(self, photo):
