@@ -9,7 +9,12 @@ from typing import Optional
 class IncorrectSettingError(Exception):
     pass
 
+
 class CameraPositionError(Exception):
+    pass
+
+
+class IncorrectModeCompareError(Exception):
     pass
 
 
@@ -164,6 +169,8 @@ class Magician:
             else:
                 rframe = cv2.copyMakeBorder(frame, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
                                             value=0)
+        else:
+            rframe = frame
         return rframe
 
 
@@ -178,7 +185,7 @@ class Witch(Magician):
 
     def move_camera(self, coords: tuple) -> Optional[tuple]:
         if self.camera_coords is not None:
-            coef = 5
+            coef = 10
             gx, gy = self.camera_coords[:2]
             x, y = coords[:2]
             if gx > x:
@@ -197,4 +204,19 @@ class Witch(Magician):
             self.camera_coords = (gx, gy)
             return gx, gy
         else:
-            raise CameraPositionError('Please^ set up last face before using')
+            raise CameraPositionError('Please^ set up camera coordinates before using')
+
+    def move_camera_to_compare_face(self, mode: str, faces_coords: tuple, photo: np.array) -> tuple:
+        if mode == 'd':
+            index = self.compare_lastface_and_newface_distance(faces_coords, photo)
+        elif mode == 'h':
+            index = self.compare_lastface_and_newface_hist(faces_coords, photo)
+        elif mode == 'm':
+            index = self.compare_lastface_and_newface_model(faces_coords, photo)
+        else:
+            raise IncorrectModeCompareError('Mode can include only characters: m - model comparing, '
+                                            'd - distance comparing, h - histogram comparing')
+        x, y, w, h = faces_coords[index]
+        self.set_last_face((x, y, w, h), photo)
+        gx, gy = self.move_camera((x, y))
+        return gx, gy, w, h, index
