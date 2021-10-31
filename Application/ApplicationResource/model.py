@@ -6,7 +6,10 @@ import numpy as np
 from typing import Optional
 
 
-class IncorrectSetting(Exception):
+class IncorrectSettingError(Exception):
+    pass
+
+class CameraPositionError(Exception):
     pass
 
 
@@ -16,7 +19,7 @@ class Magician:
 
     # метод для указания последнего найденного лица
     def set_last_face(self, coords: tuple, photo: np.array) -> None:
-        self.last_face_coords = coords
+        self.last_face_coords = coords[:4]
         self.last_face_photo = photo
         self.last_face_finded = True
 
@@ -38,7 +41,7 @@ class Magician:
 
     def compare_lastface_and_newface_hist(self, faces_coords: tuple, photo: np.array) -> int:
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
         last_face = cv2.resize(
             self.last_face_photo[last_face_y:last_face_y+last_face_h, last_face_x:last_face_x + last_face_w], (128, 128)
         )
@@ -64,7 +67,7 @@ class Magician:
 
     def compare_lastface_and_newface_model(self, faces_coords: tuple, photo: np.array) -> int:
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
         last_face = cv2.resize(
             self.last_face_photo[last_face_y:last_face_y+last_face_h, last_face_x:last_face_x + last_face_w], (224, 224)
         )
@@ -89,7 +92,7 @@ class Magician:
     def compare_lastface_and_newface_distance(self, faces_coords: tuple, photo: np.array) -> int:
         height, width, channels = photo.shape
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
         last_face_central_x, last_face_central_y = last_face_x + last_face_w // 2, last_face_y + last_face_h // 2
         for x, y, w, h in faces_coords:
             central_x, central_y = x + w // 2, y + h // 2
@@ -106,7 +109,7 @@ class Magician:
             faces_coords = list(sorted(faces_coords, key=lambda x: x[2], reverse=True))
             return faces_coords
         except AttributeError:
-            raise IncorrectSetting('Please, set up for searching faces by opencv. '
+            raise IncorrectSettingError('Please, set up for searching faces by opencv. '
                                    'Write Magician.set_for_searching_by_opencv(path_cascade)')
 
     def search_faces_from_raw_photo_yolo(self, photo: np.array) -> Optional[tuple]:
@@ -120,7 +123,7 @@ class Magician:
             faces_coords = list(sorted(faces_coords, key=lambda x: (x[0], x[1])))
             return faces_coords
         except AttributeError:
-            raise IncorrectSetting('Please, set up for searching faces by yolo. '
+            raise IncorrectSettingError('Please, set up for searching faces by yolo. '
                                    'Write Magician.set_for_searching_by_yolo()')
 
     def make_stable_watch(self, x: int, y: int, w: int, h: int, dpw: int, dph: int, width: int, height: int) -> tuple:
@@ -162,3 +165,36 @@ class Magician:
                 rframe = cv2.copyMakeBorder(frame, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
                                             value=0)
         return rframe
+
+
+class Witch(Magician):
+    def __init__(self):
+        super().__init__()
+        self.camera_coords = None
+        self.searching_by = None
+
+    def set_camera_coords(self, coords: tuple) -> None:
+        self.camera_coords = coords[:2]
+
+    def move_camera(self, coords: tuple) -> Optional[tuple]:
+        if self.camera_coords is not None:
+            coef = 5
+            gx, gy = self.camera_coords[:2]
+            x, y = coords[:2]
+            if gx > x:
+                gx -= (gx - x) // coef
+            elif gx < x:
+                gx += (-gx + x) // coef
+            else:
+                pass
+
+            if gy > y:
+                gy -= (gy - y) // coef
+            elif gy < y:
+                gy += (-gy + y) // coef
+            else:
+                pass
+            self.camera_coords = (gx, gy)
+            return gx, gy
+        else:
+            raise CameraPositionError('Please^ set up last face before using')
