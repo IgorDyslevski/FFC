@@ -6,7 +6,15 @@ import numpy as np
 from typing import Optional
 
 
-class IncorrectSetting(Exception):
+class IncorrectSettingError(Exception):
+    pass
+
+
+class CameraPositionError(Exception):
+    pass
+
+
+class IncorrectModeCompareError(Exception):
     pass
 
 
@@ -15,8 +23,8 @@ class Magician:
         self.unset_last_face()
 
     # метод для указания последнего найденного лица
-    def set_last_face(self, coords: tuple, photo: np.array) -> None:
-        self.last_face_coords = coords
+    def set_last_face(self, coords_x_y_w_h: tuple, photo: np.array) -> None:
+        self.last_face_coords = coords_x_y_w_h[:4]
         self.last_face_photo = photo
         self.last_face_finded = True
 
@@ -36,15 +44,15 @@ class Magician:
     def set_model(self, path: str) -> None:
         self.model = load_model(path)
 
-    def compare_lastface_and_newface_hist(self, faces_coords: tuple, photo: np.array) -> int:
+    def compare_lastface_and_newface_hist(self, faces_coords_x_y_w_h: tuple, photo: np.array) -> int:
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
         last_face = cv2.resize(
             self.last_face_photo[last_face_y:last_face_y+last_face_h, last_face_x:last_face_x + last_face_w], (128, 128)
         )
         last_face_hist = cv2.calcHist([last_face], [0], None, [256],
                                       [0, 256])
-        for x, y, w, h in faces_coords:
+        for x, y, w, h in faces_coords_x_y_w_h:
             if x > -1 and y > -1:
                 face = cv2.resize(photo[y:y+h, x:x+w], (128, 128))
             else:
@@ -62,14 +70,14 @@ class Magician:
         index_of_min_differnce = results_of_getting_distance.index(min(results_of_getting_distance))
         return index_of_min_differnce
 
-    def compare_lastface_and_newface_model(self, faces_coords: tuple, photo: np.array) -> int:
+    def compare_lastface_and_newface_model(self, faces_coords_x_y_w_h: tuple, photo: np.array) -> int:
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
         last_face = cv2.resize(
             self.last_face_photo[last_face_y:last_face_y+last_face_h, last_face_x:last_face_x + last_face_w], (224, 224)
         )
         last_face_emb = self.model.predict(last_face[None])
-        for x, y, w, h in faces_coords:
+        for x, y, w, h in faces_coords_x_y_w_h:
             if x > -1 and y > -1:
                 face = cv2.resize(photo[y:y+h, x:x+w], (224, 224))
             else:
@@ -86,12 +94,13 @@ class Magician:
         index_of_min_differnce = results_of_getting_distance.index(min(results_of_getting_distance))
         return index_of_min_differnce
 
-    def compare_lastface_and_newface_distance(self, faces_coords: tuple, photo: np.array) -> int:
+    def compare_lastface_and_newface_distance(self, faces_coords_x_y_w_h: tuple, photo: np.array) -> int:
         height, width, channels = photo.shape
         results_of_getting_distance = []
-        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords
-        last_face_central_x, last_face_central_y = last_face_x + last_face_w // 2, last_face_y + last_face_h // 2
-        for x, y, w, h in faces_coords:
+        last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
+        last_face_central_x, last_face_central_y = self.get_mean_coords((last_face_x, last_face_y,
+                                                                         last_face_w, last_face_h))
+        for x, y, w, h in faces_coords_x_y_w_h:
             central_x, central_y = x + w // 2, y + h // 2
             results_of_getting_distance.append(
                 (abs(last_face_central_x - central_x) ** 2 + abs(last_face_central_y - central_y) ** 2) ** 0.5
@@ -102,55 +111,81 @@ class Magician:
     def search_faces_from_raw_photo_cv2(self, photo: np.array) -> Optional[tuple]:
         try:
             gray_photo = cv2.cvtColor(photo, cv2.COLOR_BGR2GRAY)
-            faces_coords = self.processor.detectMultiScale(gray_photo, 1.2, 1)
-            faces_coords = list(sorted(faces_coords, key=lambda x: x[2], reverse=True))
-            return faces_coords
+            faces_coords_x_y_w_h = self.processor.detectMultiScale(gray_photo, 1.2, 1)
+            faces_coords_x_y_w_h = list(sorted(faces_coords_x_y_w_h, key=lambda x: x[2], reverse=True))
+            return faces_coords_x_y_w_h
         except AttributeError:
-            raise IncorrectSetting('Please, set up for searching faces by opencv. '
+            raise IncorrectSettingError('Please, set up for searching faces by opencv. '
                                    'Write Magician.set_for_searching_by_opencv(path_cascade)')
 
     def search_faces_from_raw_photo_yolo(self, photo: np.array) -> Optional[tuple]:
         try:
             _, box, conf = self.processor.face_detection(frame_arr=photo, frame_status=True, model='tiny')
-            faces_coords = []
+            faces_coords_x_y_w_h = []
             if box.__len__() > 0:
                 for item in box:
                     a = [item[0], item[1], item[3], item[2]]
-                    faces_coords.append(a)
-            faces_coords = list(sorted(faces_coords, key=lambda x: (x[0], x[1])))
-            return faces_coords
+                    faces_coords_x_y_w_h.append(a)
+            faces_coords_x_y_w_h = list(sorted(faces_coords_x_y_w_h, key=lambda x: (x[0], x[1])))
+            return faces_coords_x_y_w_h
         except AttributeError:
-            raise IncorrectSetting('Please, set up for searching faces by yolo. '
+            raise IncorrectSettingError('Please, set up for searching faces by yolo. '
                                    'Write Magician.set_for_searching_by_yolo()')
 
-    def make_stable_watch(self, x: int, y: int, w: int, h: int, dpw: int, dph: int, width: int, height: int) -> tuple:
-        x_r = x + w + dpw - width - 1
+    def get_mean_coords(self, coords_x_y_w_h: tuple) -> tuple:
+        x, y, w, h = coords_x_y_w_h[:4]
+        mean_x, mean_y = x + w // 2, y + h // 2
+        return mean_x, mean_y
 
-        if w == h:
-            pass
-        elif w > h:
-            dph += (w - h) // 2
-        elif h > w:
-            dpw += (h - w) // 2
 
-        xg, yg, wg, hg = x, y, w, h
-        x_r = x + w + dpw - width
-        y_r = y + h + dph - height
-        xr = 0
-        if x - dpw < 0:
-            xr = (x - dpw) * -1
-        xl = 0
-        if x + w + dpw - width > 0:
-            xl = x + w + dpw - width
-        yr = 0
-        if y - dph < 0:
-            yr = (y - dph) * -1
-        yl = 0
-        if y + h + dph - width > 0:
-            yl = y + h + dph - height
+class Witch(Magician):
+    def __init__(self):
+        super().__init__()
+        self.camera_coords = None
+        self.searching_by = None
 
-        xg, yg, wg, hg = x - dpw + xr - xl, y - dph + yr - yl, x + w + dpw + xr - xl, y + h + dph + yr - yl
-        return xg, yg, wg, hg
+    def set_camera_coords(self, coords__mean_x__mean_y: tuple) -> None:
+        self.camera_coords = coords__mean_x__mean_y[:2]
+
+    def move_camera(self, coords__mean_x__mean_y: tuple) -> Optional[tuple]:
+        if self.camera_coords is not None:
+            coef = 10
+            gx, gy = self.camera_coords[:2]
+            x, y = coords__mean_x__mean_y[:2]
+            if gx > x:
+                gx -= (gx - x) // coef
+            elif gx < x:
+                gx += (-gx + x) // coef
+            else:
+                pass
+
+            if gy > y:
+                gy -= (gy - y) // coef
+            elif gy < y:
+                gy += (-gy + y) // coef
+            else:
+                pass
+            self.camera_coords = (gx, gy)
+            mean_x, mean_y = gx, gy
+            return mean_x, mean_y
+        else:
+            raise CameraPositionError('Please^ set up camera coordinates before using')
+
+    def move_camera_to_compare_face(self, mode: str, faces_coords_x_y_w_h: tuple, photo: np.array) -> tuple:
+        if mode == 'd':
+            index = self.compare_lastface_and_newface_distance(faces_coords_x_y_w_h, photo)
+        elif mode == 'h':
+            index = self.compare_lastface_and_newface_hist(faces_coords_x_y_w_h, photo)
+        elif mode == 'm':
+            index = self.compare_lastface_and_newface_model(faces_coords_x_y_w_h, photo)
+        else:
+            raise IncorrectModeCompareError('Mode can include only characters: m - model comparing, '
+                                            'd - distance comparing, h - histogram comparing')
+        x, y, w, h = faces_coords_x_y_w_h[index]
+        self.set_last_face((x, y, w, h), photo)
+        gx, gy = self.move_camera((*self.get_mean_coords((x, y, w, h)),))
+        mean_x, mean_y = gx, gy
+        return mean_x, mean_y, w, h, index
 
     def make_borders(self, frame: np.array) -> np.array:
         h, w, _ = frame.shape
@@ -161,4 +196,23 @@ class Magician:
             else:
                 rframe = cv2.copyMakeBorder(frame, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
                                             value=0)
+        else:
+            rframe = frame
         return rframe
+
+    def make_stable(self, coords__mean_x__mean_y: tuple, size_future_face: tuple, size_frame: tuple) -> tuple:
+        x, y = coords__mean_x__mean_y[:2]
+        w, h = size_future_face[:2]
+        first_point = x - w // 2, y - h // 2
+        second_point = x + w // 2, y + h // 2
+        w, h = size_frame[:2]
+        if first_point[0] < 0:
+            x += 0 - first_point[0]
+        if first_point[1] < 0:
+            y += 0 - first_point[1]
+        if second_point[0] > w:
+            x -= second_point[0] - w
+        if second_point[1] > h:
+            y -= second_point[1] - h
+        mean_x, mean_y = x, y
+        return mean_x, mean_y
