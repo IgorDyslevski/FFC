@@ -197,3 +197,20 @@ class Witch(Magician):
         else:
             rframe = frame
         return rframe
+
+    def make_stable(self, coords: tuple, size_future_face: tuple, size_frame: tuple) -> tuple:
+        x, y, w, h = coords[:4]
+        x, y = x + w // 2, y + h // 2
+        w, h = size_future_face[:2]
+        first_point = x - w // 2, y - h // 2
+        second_point = x + w // 2, y + h // 2
+        w, h = size_frame[:2]
+        if first_point[0] < 0:
+            x += 0 - first_point[0]
+        if first_point[1] < 0:
+            y += 0 - first_point[1]
+        if second_point[0] > w:
+            x -= second_point[0] - w
+        if second_point[1] > h:
+            y -= second_point[1] - h
+        return x, y
