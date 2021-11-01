@@ -98,7 +98,8 @@ class Magician:
         height, width, channels = photo.shape
         results_of_getting_distance = []
         last_face_x, last_face_y, last_face_w, last_face_h = self.last_face_coords[:4]
-        last_face_central_x, last_face_central_y = last_face_x + last_face_w // 2, last_face_y + last_face_h // 2
+        last_face_central_x, last_face_central_y = self.get_mean_coords((last_face_x, last_face_y,
+                                                                         last_face_w, last_face_h))
         for x, y, w, h in faces_coords:
             central_x, central_y = x + w // 2, y + h // 2
             results_of_getting_distance.append(
@@ -131,47 +132,10 @@ class Magician:
             raise IncorrectSettingError('Please, set up for searching faces by yolo. '
                                    'Write Magician.set_for_searching_by_yolo()')
 
-    def make_stable_watch(self, x: int, y: int, w: int, h: int, dpw: int, dph: int, width: int, height: int) -> tuple:
-        x_r = x + w + dpw - width - 1
-
-        if w == h:
-            pass
-        elif w > h:
-            dph += (w - h) // 2
-        elif h > w:
-            dpw += (h - w) // 2
-
-        xg, yg, wg, hg = x, y, w, h
-        x_r = x + w + dpw - width
-        y_r = y + h + dph - height
-        xr = 0
-        if x - dpw < 0:
-            xr = (x - dpw) * -1
-        xl = 0
-        if x + w + dpw - width > 0:
-            xl = x + w + dpw - width
-        yr = 0
-        if y - dph < 0:
-            yr = (y - dph) * -1
-        yl = 0
-        if y + h + dph - width > 0:
-            yl = y + h + dph - height
-
-        xg, yg, wg, hg = x - dpw + xr - xl, y - dph + yr - yl, x + w + dpw + xr - xl, y + h + dph + yr - yl
-        return xg, yg, wg, hg
-
-    def make_borders(self, frame: np.array) -> np.array:
-        h, w, _ = frame.shape
-        if w != h:
-            if w > h:
-                rframe = cv2.copyMakeBorder(frame, (w - h) // 2, (w - h) // 2, 0, 0, cv2.BORDER_CONSTANT, None,
-                                            value=0)
-            else:
-                rframe = cv2.copyMakeBorder(frame, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
-                                            value=0)
-        else:
-            rframe = frame
-        return rframe
+    def get_mean_coords(self, coords: tuple) -> tuple:
+        x, y, w, h = coords[:4]
+        mean_x, mean_y = x + w // 2, y + h // 2
+        return mean_x, mean_y
 
 
 class Witch(Magician):
@@ -220,3 +184,16 @@ class Witch(Magician):
         self.set_last_face((x, y, w, h), photo)
         gx, gy = self.move_camera((x, y))
         return gx, gy, w, h, index
+
+    def make_borders(self, frame: np.array) -> np.array:
+        h, w, _ = frame.shape
+        if w != h:
+            if w > h:
+                rframe = cv2.copyMakeBorder(frame, (w - h) // 2, (w - h) // 2, 0, 0, cv2.BORDER_CONSTANT, None,
+                                            value=0)
+            else:
+                rframe = cv2.copyMakeBorder(frame, 0, 0, (h - w) // 2, (h - w) // 2, cv2.BORDER_CONSTANT, None,
+                                            value=0)
+        else:
+            rframe = frame
+        return rframe
