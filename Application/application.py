@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget
 from PyQt6 import QtWidgets
-from pyui.mainscreen import Ui_Form
+from pyui.mainscreen2 import Ui_Form
 import sys
 import cv2
 from ApplicationResource.model import Witch, IncorrectModeCompareError, IncorrectSettingError, CameraPositionError
@@ -19,6 +19,7 @@ class App(Ui_Form, QWidget):
         self.setupUi(self)
         self.workswithvideobutton.clicked.connect(self.modeon0)
         self.recordvideowithprocess.clicked.connect(self.modeon1)
+        self.returnwithoutsaving.clicked.connect(self.modeon2)
 
         self.camera = None
         self.mag = Witch()
@@ -55,6 +56,14 @@ class App(Ui_Form, QWidget):
         self.videowritter = cv2.VideoWriter(self.path_result_video,
                                             cv2.VideoWriter_fourcc(*'h264'), 60,
                                             (self.resolution, self.resolution))
+        while True:
+            face = self.get_frame_video()
+            cv2.imshow('face', face)
+
+    def modeon2(self):
+        global mode
+        mode = 1
+        self.camera = cv2.VideoCapture(0)
         while True:
             face = self.get_frame_video()
             cv2.imshow('face', face)
