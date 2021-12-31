@@ -22,6 +22,10 @@ class App(Ui_Form, QWidget):
         self.returnwithoutsaving.clicked.connect(self.modeon2)
 
         self.camera = None
+        self.lite = False
+        self.frame_proccessed = 1
+        self.i_frame_proccessed = 1
+        self.last_faces_coords = None
         self.mag = Witch()
         self.mag.set_for_searching_by_yolo()
         self.recording = False
@@ -35,6 +39,7 @@ class App(Ui_Form, QWidget):
         path_video = self.getFileFrom()
         self.path_result_video = self.getFileTo()
         self.resolution = self.getint('Exited resolution (square)')
+        self.check_lite()
         self.camera = cv2.VideoCapture(path_video)
         self.videowritter = cv2.VideoWriter(self.path_result_video,
                                             cv2.VideoWriter_fourcc(*'h264'), self.camera.get(cv2.CAP_PROP_FPS),
@@ -52,6 +57,7 @@ class App(Ui_Form, QWidget):
         mode = 1
         self.path_result_video = self.getFileTo()
         self.resolution = self.getint('Exited resolution (square)')
+        self.check_lite()
         self.camera = cv2.VideoCapture(0)
         self.videowritter = cv2.VideoWriter(self.path_result_video,
                                             cv2.VideoWriter_fourcc(*'h264'), 60,
@@ -63,17 +69,26 @@ class App(Ui_Form, QWidget):
     def modeon2(self):
         global mode
         mode = 1
+        self.check_lite()
         self.camera = cv2.VideoCapture(0)
         while True:
             face = self.get_frame_video()
             cv2.imshow('face', face)
 
+    def check_lite(self):
+        a = self.getint('1 из ... будут обработаны')
+        if a == 1:
+            self.lite = False
+        else:
+            self.lite = True
+        self.frame_proccessed = a
+
     def gettext(self, text):
         text, okPressed = QtWidgets.QInputDialog.getText(self, "Get text", text, QtWidgets.QLineEdit.Normal, "")
         return text
 
-    def getint(self, text):
-        text, okPressed = QtWidgets.QInputDialog.getInt(self, "Get integer", text)
+    def getint(self, text='Введите число'):
+        text, okPressed = QtWidgets.QInputDialog.getInt(self, "Get integer", text, 1, 0)
         return text
 
     def getFileTo(self):
@@ -89,7 +104,18 @@ class App(Ui_Form, QWidget):
         ret, frame = camera.read()
         # getting face coordinates from camera
         try:
-            faces_coords = mag.search_faces_from_raw_photo_yolo(frame)
+            if self.lite:
+                if self.frame_proccessed == self.i_frame_proccessed:
+                    faces_coords = mag.search_faces_from_raw_photo_yolo(frame)
+                    self.last_faces_coords = faces_coords
+                else:
+                    faces_coords = self.last_faces_coords
+                self.i_frame_proccessed += 1
+                if self.i_frame_proccessed > self.frame_proccessed:
+                    self.i_frame_proccessed = 1
+            else:
+                faces_coords = mag.search_faces_from_raw_photo_yolo(frame)
+                self.last_faces_coords = faces_coords
         except Exception as e:
             if self.recording:
                 self.videowritter.release()
@@ -99,6 +125,8 @@ class App(Ui_Form, QWidget):
         copy_frame = frame.copy()
         main_face = None
         # putting index and rectangle into frame
+        if faces_coords == None:
+            faces_coords = []
         for i in range(1, len(faces_coords) + 1):
             x, y, w, h = faces_coords[i - 1]
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0))
